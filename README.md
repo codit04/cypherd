@@ -31,16 +31,17 @@ A simplified cryptocurrency wallet application that simulates Web3 wallet functi
 ```
 mock-web3-wallet/
 ├── backend/
+│   ├── migrations/       # Database schema migrations
+│   ├── models/           # Pydantic models and schemas
+│   ├── repositories/     # Data access layer
 │   ├── routers/          # FastAPI route handlers
 │   ├── services/         # Business logic layer
-│   ├── repositories/     # Data access layer
-│   ├── models/           # Pydantic models and schemas
-│   ├── utils/            # Utility functions (crypto, validation)
+│   ├── utils/            # Utility functions (database, crypto)
 │   ├── main.py           # FastAPI application entry point
 │   └── .env.example      # Environment variables template
 ├── frontend/
 │   ├── app.py            # Streamlit application
-│   └── .env.example.frontend      # Frontend environment variables
+│   └── .env.example      # Frontend environment variables
 ├── requirements.txt      # Python dependencies
 └── README.md
 ```
@@ -72,9 +73,19 @@ mock-web3-wallet/
    cp backend/.env.example backend/.env
    cp frontend/.env.example.frontend frontend/.env
    ```
-   Edit the `.env` files with your configuration.
+   Edit `backend/.env` with your Supabase credentials:
+   ```
+   host=your-supabase-host.pooler.supabase.com
+   port=6543
+   dbname=postgres
+   user=postgres.your-project-id
+   password=your-password
+   ```
 
-5. Set up database
+5. Initialize database:
+   ```bash
+   python3 backend/migrations/init_db.py
+   ```
 
 ### Running
 
