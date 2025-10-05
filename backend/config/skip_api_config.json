@@ -1,0 +1,12 @@
+{
+  "api_url": "https://api.skip.build/v2/fungible/msgs_direct",
+  "usdc_contract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+  "eth_denom": "ethereum-native",
+  "chain_id": "1",
+  "usdc_decimals": 6,
+  "eth_decimals": 18,
+  "api_timeout": 5.0,
+  "recipient_address": "0x742d35Cc6634C0532925a3b8D4C9db96c728b0B4",
+  "slippage_tolerance_percent": "1",
+  "default_price_tolerance_percent": "1.0"
+}
