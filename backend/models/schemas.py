@@ -97,6 +97,7 @@ class AccountResponse(BaseModel):
     balance: str  # String representation of Decimal
     created_at: datetime
     updated_at: datetime
+    private_key: Optional[str] = None  # Only included on account creation for testing
 
 
 class AccountUpdateLabelRequest(BaseModel):

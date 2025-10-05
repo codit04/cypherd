@@ -12,7 +12,10 @@ import logging
 from backend.utils.crypto_manager import CryptoManager
 from backend.repositories.transaction_repository import TransactionRepository
 from backend.repositories.account_repository import AccountRepository
+from backend.repositories.wallet_repository import WalletRepository
+from backend.repositories.notification_preferences_repository import NotificationPreferencesRepository
 from backend.services.skip_api_service import SkipAPIService
+from backend.services.notification_service import NotificationService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -56,7 +59,10 @@ class TransactionService:
         self.crypto_manager = CryptoManager()
         self.transaction_repo = TransactionRepository()
         self.account_repo = AccountRepository()
+        self.wallet_repo = WalletRepository()
+        self.notification_prefs_repo = NotificationPreferencesRepository()
         self.skip_api_service = SkipAPIService()
+        self.notification_service = NotificationService()
     
     def create_approval_message(
         self,
@@ -357,6 +363,17 @@ class TransactionService:
                 f"{final_eth_amount} ETH from {from_account['address']} to {pending_approval.to_address}"
             )
             
+            # Send notifications after successful transaction
+            self._send_transaction_notifications(
+                from_account=from_account,
+                to_account=to_account,
+                to_address=pending_approval.to_address,
+                transaction_id=created_tx_id,
+                amount=final_eth_amount,
+                transaction_type=transaction_type,
+                memo=pending_approval.memo
+            )
+            
             # Return transaction details
             return {
                 'transaction_id': created_tx_id,
@@ -506,3 +523,93 @@ class TransactionService:
             logger.info(f"Cleaned up {len(expired_ids)} expired approval messages")
         
         return len(expired_ids)
+    
+    def _send_transaction_notifications(
+        self,
+        from_account: Dict[str, Any],
+        to_account: Optional[Dict[str, Any]],
+        to_address: str,
+        transaction_id: str,
+        amount: Decimal,
+        transaction_type: str,
+        memo: Optional[str] = None
+    ) -> None:
+        """
+        Send notifications for a completed transaction.
+        
+        This method:
+        1. Retrieves notification preferences for sender's wallet
+        2. Sends notification to sender if enabled and outgoing notifications are on
+        3. If recipient is in the same wallet, sends notification if incoming notifications are on
+        4. Handles notification failures gracefully without blocking transaction
+        5. Logs all notification attempts and results
+        
+        Args:
+            from_account: Sender account dictionary
+            to_account: Recipient account dictionary (None if external address)
+            to_address: Recipient Ethereum address
+            transaction_id: Unique transaction ID
+            amount: Transaction amount in ETH
+            transaction_type: Type of transaction ('send', 'receive', 'internal')
+            memo: Optional transaction memo
+        """
+        try:
+            # Get sender's wallet notification preferences
+            sender_prefs = self.notification_prefs_repo.get_by_wallet_id(from_account['wallet_id'])
+            
+            if sender_prefs and sender_prefs['enabled'] and sender_prefs['phone_number']:
+                # Send notification to sender if outgoing notifications are enabled
+                if sender_prefs['notify_outgoing']:
+                    logger.info(f"Sending outgoing transaction notification to sender for TX {transaction_id}")
+                    
+                    success = self.notification_service.send_transaction_notification(
+                        phone_number=sender_prefs['phone_number'],
+                        transaction_type='send',
+                        amount=amount,
+                        from_address=from_account['address'],
+                        to_address=to_address,
+                        transaction_id=transaction_id,
+                        memo=memo
+                    )
+                    
+                    if success:
+                        logger.info(f"Successfully sent outgoing notification for TX {transaction_id}")
+                    else:
+                        logger.warning(f"Failed to send outgoing notification for TX {transaction_id}")
+                else:
+                    logger.info(f"Outgoing notifications disabled for wallet {from_account['wallet_id']}")
+            else:
+                logger.info(f"Notifications not enabled for sender wallet {from_account['wallet_id']}")
+            
+            # If recipient is also in a wallet (internal or to another wallet account), send notification
+            if to_account:
+                recipient_prefs = self.notification_prefs_repo.get_by_wallet_id(to_account['wallet_id'])
+                
+                if recipient_prefs and recipient_prefs['enabled'] and recipient_prefs['phone_number']:
+                    # Send notification to recipient if incoming notifications are enabled
+                    if recipient_prefs['notify_incoming']:
+                        logger.info(f"Sending incoming transaction notification to recipient for TX {transaction_id}")
+                        
+                        success = self.notification_service.send_transaction_notification(
+                            phone_number=recipient_prefs['phone_number'],
+                            transaction_type='receive' if transaction_type != 'internal' else 'internal',
+                            amount=amount,
+                            from_address=from_account['address'],
+                            to_address=to_address,
+                            transaction_id=transaction_id,
+                            memo=memo
+                        )
+                        
+                        if success:
+                            logger.info(f"Successfully sent incoming notification for TX {transaction_id}")
+                        else:
+                            logger.warning(f"Failed to send incoming notification for TX {transaction_id}")
+                    else:
+                        logger.info(f"Incoming notifications disabled for wallet {to_account['wallet_id']}")
+                else:
+                    logger.info(f"Notifications not enabled for recipient wallet {to_account['wallet_id']}")
+            
+        except Exception as e:
+            # Log error but don't raise - notifications should not block transactions
+            logger.error(f"Error sending transaction notifications for TX {transaction_id}: {str(e)}")
+            logger.info("Transaction completed successfully despite notification failure")

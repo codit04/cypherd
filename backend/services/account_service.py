@@ -96,14 +96,20 @@ class AccountService:
         
         account_id = self.account_repo.create(account_data)
         
-        # Return account info
+        # Fetch the created account to get timestamps
+        created_account = self.account_repo.get_by_id(account_id)
+        
+        # Return account info (include private key for testing/development)
         return {
             'id': account_id,
             'wallet_id': wallet_id,
             'address': address,
             'account_index': next_index,
             'label': label,
-            'balance': Decimal('0.0')
+            'balance': Decimal('0.0'),
+            'created_at': created_account['created_at'],
+            'updated_at': created_account['updated_at'],
+            'private_key': private_key  # Include for testing purposes
         }
     
     def get_account(self, account_id: str) -> Dict[str, Any]:
