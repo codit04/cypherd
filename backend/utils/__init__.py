@@ -8,10 +8,12 @@ from .database import (
     get_db_cursor,
     test_connection
 )
+from .crypto_manager import CryptoManager
 
 __all__ = [
     'DatabaseConnection',
     'get_db_connection',
     'get_db_cursor',
-    'test_connection'
+    'test_connection',
+    'CryptoManager'
 ]
